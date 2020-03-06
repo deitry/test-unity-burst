@@ -4,6 +4,7 @@ using UnityEngine;
 using Unity.Burst;
 using Unity.Jobs;
 using Unity.Collections;
+using System;
 
 public class Calculate : MonoBehaviour
 {
@@ -11,13 +12,16 @@ public class Calculate : MonoBehaviour
     const int frameMax = max * max / 5;
 
     public bool jobbed;
+    public int jobCnt = 128;
+
+    private float start = 0;
 
     struct Result
     {
         public float value;
     }
 
-    [BurstCompile]
+    [BurstCompile(FloatPrecision.Low, FloatMode.Fast, CompileSynchronously = true)]
     struct ToughJob : IJobParallelFor
     {
         public long offset;
@@ -29,10 +33,8 @@ public class Calculate : MonoBehaviour
             var i2 = (offset + index) % max;
             long product = i1 * i2;
 
-            var output = result[0];
-            if (output.value < product)
-                output.value = product;
-            result[0] = output;
+            if (result[0].value < product)
+                result[0] = new Result { value = product };
         }
     }
 
@@ -49,19 +51,20 @@ public class Calculate : MonoBehaviour
 
         while (processed < total)
         {
+            int needToProcess = Math.Max(0, (int) Math.Min(frameMax, total - processed));
+
             new ToughJob
             {
                 offset = processed,
                 result = nativeResult,
-            }.Schedule(frameMax, 1).Complete();
+            }.Schedule(needToProcess, jobCnt).Complete();
 
-            processed += frameMax;
+            processed += needToProcess;
+
             yield return nativeResult[0].value;
         }
 
-        var result = nativeResult[0].value;
         nativeResult.Dispose();
-        yield return result;
     }
 
 
@@ -91,12 +94,13 @@ public class Calculate : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        var start = Time.realtimeSinceStartup;
+        start = Time.realtimeSinceStartup;
         var totalResult = float.MaxValue;
 
         Debug.Log($"Started");
 
         var process = jobbed ? ToughTaskJobbed() : ToughTask();
+        Debug.Log($"Before yield {Time.realtimeSinceStartup - start}");
         foreach (var result in process)
         {
             if (totalResult > result)
