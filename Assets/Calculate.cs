@@ -10,11 +10,14 @@ public class Calculate : MonoBehaviour
     const int max = 10_000;
     const int frameMax = max * max / 5;
 
+    public bool jobbed;
+
     struct Result
     {
         public float value;
     }
 
+    [BurstCompile]
     struct ToughJob : IJobParallelFor
     {
         public long offset;
@@ -27,8 +30,9 @@ public class Calculate : MonoBehaviour
             long product = i1 * i2;
 
             var output = result[0];
-            if (output.value > product)
+            if (output.value < product)
                 output.value = product;
+            result[0] = output;
         }
     }
 
@@ -40,14 +44,14 @@ public class Calculate : MonoBehaviour
         NativeArray<Result> nativeResult = new NativeArray<Result>(1, Allocator.TempJob);
         nativeResult[0] = new Result
         {
-            value = float.MaxValue
+            value = 0
         };
 
         while (processed < total)
         {
             new ToughJob
             {
-                offset = 0,
+                offset = processed,
                 result = nativeResult,
             }.Schedule(frameMax, 1).Complete();
 
@@ -88,15 +92,19 @@ public class Calculate : MonoBehaviour
     void Start()
     {
         var start = Time.realtimeSinceStartup;
+        var totalResult = float.MaxValue;
+
         Debug.Log($"Started");
 
-        //var process = ToughTask();
-        var process = ToughTaskJobbed();
+        var process = jobbed ? ToughTaskJobbed() : ToughTask();
         foreach (var result in process)
         {
-            Debug.Log($"FrameProcessing: {Time.realtimeSinceStartup - start}");
+            if (totalResult > result)
+                totalResult = result;
+
+            Debug.Log($"FrameProcessing: {Time.realtimeSinceStartup - start} \t result: {result}");
         }
 
-        Debug.Log($"Finished: {Time.realtimeSinceStartup - start}");
+        Debug.Log($"Finished: {Time.realtimeSinceStartup - start} \t result: {totalResult}");
     }
 }
