@@ -10,6 +10,7 @@ public class Calculate : MonoBehaviour
 {
     const int max = 10_000;
     const int frameMax = max * max / 5;
+    const int repeatCnt = 1;
 
     public bool jobbed;
     public int jobCnt = 128;
@@ -31,10 +32,13 @@ public class Calculate : MonoBehaviour
         {
             var i1 = (offset + index) / max;
             var i2 = (offset + index) % max;
-            long product = i1 * i2;
-
-            if (result[0].value < product)
-                result[0] = new Result { value = product };
+            float product = 0;
+            for (int j = 0; j < repeatCnt; j++)
+            {
+                product = i1 * i2 * (j > 0 ? j : 1);
+                if (result[0].value < product)
+                    result[0] = new Result { value = product };
+            }
         }
     }
 
@@ -77,9 +81,12 @@ public class Calculate : MonoBehaviour
         {
             for (int j = 0; j < max; j++)
             {
-                var dot = i * j;
-                if (dot > result)
-                    result = dot;
+                for (int k = 0; k < repeatCnt; k++)
+                {
+                    var dot = i * j * (k > 0 ? k : 1);
+                    if (dot > result)
+                        result = dot;
+                }
 
                 processed++;
                 if (processed > frameMax)
